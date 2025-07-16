@@ -1,9 +1,20 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+
+# Fix for TensorFlow import issues with bfloat16
+try:
+    import ml_dtypes
+except ImportError:
+    st.error("❌ Missing 'ml-dtypes'. Please install it with: pip install ml-dtypes")
+    st.stop()
+
 from tensorflow.keras.models import load_model
 
+# --- App UI ---
 st.set_page_config(page_title="Water Quality Monitor", page_icon="💧")
 st.title("💧 Smart Water Quality Analyzer")
 st.write("Upload your water test results to check safety based on WHO guidelines and AI prediction.")
@@ -25,16 +36,14 @@ if phys_file and bact_file:
 
     # --- Merge Data ---
     df = pd.merge(phys_df, bact_df, on="Sample", how="inner")
+    df.columns = df.columns.str.strip()  # Clean column names
 
-    # --- Clean column names just in case ---
-    df.columns = df.columns.str.strip()
-
-    # --- WHO Checks ---
+    # --- WHO Safety Checks ---
     df["pH_Status"] = df["pH"].apply(lambda x: "✅ OK" if 6.5 <= x <= 8.5 else "⚠️ Out of Range")
     df["TDS_Status"] = df["TDS"].apply(lambda x: "✅ OK" if x <= 1000 else "⚠️ High")
     df["EC_Status"] = df["EC_val"].apply(lambda x: "✅ OK" if x <= 1400 else "⚠️ High")
 
-    # Handle missing coliform column gracefully
+    # --- Coliform Check ---
     if "Coliform" in df.columns:
         df["Coliform_Status"] = df["Coliform"].apply(lambda x: "✅ Safe" if x == 0 else "🚨 Unsafe")
     else:
@@ -58,16 +67,20 @@ if phys_file and bact_file:
     # --- Display Results ---
     st.subheader("📋 Full Analysis")
     st.dataframe(df[[
-        "Sample", "pH", "pH_Status", "TDS", "TDS_Status", 
+        "Sample", "pH", "pH_Status", "TDS", "TDS_Status",
         "EC_val", "EC_Status", "Coliform_Status", "Interpretation"
     ]])
 
-    # --- Safety Summary ---
+    # --- Summary Alert ---
     if "🚨 Unsafe" in df["Coliform_Status"].values:
         st.error("⚠️ Microbial contamination detected in one or more samples.")
-    elif "⚠️ Out of Range" in df["pH_Status"].values or "⚠️ High" in df["TDS_Status"].values or "⚠️ High" in df["EC_Status"].values:
+    elif "⚠️ Out of Range" in df["pH_Status"].values or \
+         "⚠️ High" in df["TDS_Status"].values or \
+         "⚠️ High" in df["EC_Status"].values:
         st.warning("⚠️ Some physico-chemical values exceed WHO guidelines.")
     else:
         st.success("✅ All parameters within WHO safety thresholds.")
+
 else:
     st.info("📂 Please upload both Physical and Bacterial CSV files to begin.")
+
