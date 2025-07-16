@@ -1,6 +1,6 @@
 streamlit
-numpy
 pandas
-scikit-learn
+numpy
 tensorflow
 joblib
+ml-dtypes
